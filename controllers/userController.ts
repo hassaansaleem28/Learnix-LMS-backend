@@ -12,7 +12,7 @@ import {
   sendToken,
 } from "../utils/jwt";
 import { redis } from "../utils/redis";
-import { getUserById } from "../services/user.service";
+import { getAllUsersService, getUserById } from "../services/user.service";
 import cloudinary from "../utils/cloudinary";
 
 interface IRegisterationBody {
@@ -354,6 +354,18 @@ export const updateAvatar = catchAsyncErrors(async function (
     await redis.set(userId as string, JSON.stringify(user));
 
     res.status(200).json({ success: true, user });
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});
+
+export const getAllUsers = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    getAllUsersService(req, res, next);
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
   }

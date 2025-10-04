@@ -15,3 +15,16 @@ export const createCourse = catchAsyncErrors(async function (
     next(new ErrorHandler(error.message, 400));
   }
 });
+
+export const getAllCoursesService = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const allCourses = await courseModel.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, allCourses });
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});

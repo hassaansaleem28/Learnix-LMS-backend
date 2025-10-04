@@ -15,3 +15,16 @@ export const newOrder = catchAsyncErrors(async function (
     return next(new ErrorHandler(error.message, 400));
   }
 });
+
+export const getAllOrdersService = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const allOrders = await orderModel.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, allOrders });
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});
