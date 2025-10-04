@@ -24,3 +24,12 @@ export const getAllUsersService = catchAsyncErrors(async function (
   const allUsers = await userModel.find().sort({ createdAt: -1 });
   res.status(200).json({ success: true, allUsers });
 });
+
+export const updateUserRoleService = async function (
+  res: Response,
+  id: string,
+  role: string
+) {
+  const user = await userModel.findByIdAndUpdate(id, { role }, { new: true });
+  res.status(200).json({ success: true, user });
+};
