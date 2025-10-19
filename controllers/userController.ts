@@ -165,7 +165,7 @@ export const logoutUser = catchAsyncErrors(async function (
     redis.del(userId as string);
     res.status(200).json({
       success: true,
-      message: "You have successfully Logged out! Come back soon!",
+      message: "You have successfully Logged out. Come back soon!",
     });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
@@ -207,7 +207,7 @@ export const updateAccessToken = catchAsyncErrors(async function (
     res.cookie("access_token", accessToken, accessTokenOptions);
     res.cookie("refresh_token", refreshToken, refreshTokenOptions);
     await redis.set(user._id, JSON.stringify(user), "EX", 604800); // 7 days
-    res.status(200).json({ success: true, accessToken });
+    next();
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
   }
@@ -262,18 +262,10 @@ export const updateUserInfo = catchAsyncErrors(async function (
   next: NextFunction
 ) {
   try {
-    const { name, email } = req.body as IUpdateUserInfo;
+    const { name } = req.body as IUpdateUserInfo;
     const userId = req.user?._id;
     const user = await userModel.findById(userId);
 
-    if (user && email) {
-      const isEmailExists = await userModel.findOne({ email });
-      if (isEmailExists) {
-        return next(new ErrorHandler("Email already exists!", 400));
-      }
-      user.email = email;
-      await user.save();
-    }
     if (name && user) {
       user.name = name;
     }

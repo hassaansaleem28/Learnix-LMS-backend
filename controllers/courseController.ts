@@ -10,6 +10,7 @@ import path from "path";
 import ejs from "ejs";
 import sendMail from "../utils/nodemailer";
 import notificationModel from "../models/notificationModel";
+import axios from "axios";
 
 export const uploadCourse = catchAsyncErrors(async function (
   req: Request,
@@ -370,6 +371,46 @@ export const deleteCourse = catchAsyncErrors(async function (
     res
       .status(200)
       .json({ success: true, message: "Course deleted successfully!" });
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});
+
+export const generateVideoUrl = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { videoId } = req.body;
+
+    if (!videoId?.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "videoId is required" });
+    }
+    if (!process.env.VDO_CIPHER_SECRET_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: "VDO_CIPHER_SECRET_KEY is not set",
+      });
+    }
+
+    const response = await axios.post(
+      `https://dev.vdocipher.com/api/videos/${videoId}/otp`,
+      { ttl: 300 },
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          authorization: `Apisecret ${process.env.VDO_CIPHER_SECRET_KEY}`,
+        },
+      }
+    );
+    res.status(200).json({
+      success: true,
+      data: response.data,
+    });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
   }
