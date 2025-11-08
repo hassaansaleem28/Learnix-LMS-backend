@@ -44,14 +44,21 @@ export const editCourse = catchAsyncErrors(async function (
     const courseId = req.params.id;
     const thumbnail = data.thumbnail;
 
-    if (thumbnail) {
-      await cloudinary.uploader.destroy(thumbnail.public_id);
+    const courseData = (await courseModel.findById(courseId)) as any;
+    if (thumbnail && !thumbnail.startsWith("https")) {
+      await cloudinary.uploader.destroy(courseData.thumbnail.public_id);
       const cloud = await cloudinary.uploader.upload(thumbnail, {
         folder: "courses",
       });
       data.thumbnail = {
         public_id: cloud.public_id,
         url: cloud.secure_url,
+      };
+    }
+    if (thumbnail.startsWith("https")) {
+      data.thumbnail = {
+        public_id: courseData?.thumbnail?.public_id,
+        url: courseData?.thumbnail?.secure_url,
       };
     }
     const course = await courseModel.findByIdAndUpdate(
@@ -98,19 +105,12 @@ export const getAllCourses = catchAsyncErrors(async function (
   next: NextFunction
 ) {
   try {
-    const isCacheExists = await redis.get("allCourses");
-    if (isCacheExists) {
-      const courses = JSON.parse(isCacheExists);
-      res.status(200).json({ success: true, courses });
-    } else {
-      const allCourses = await courseModel
-        .find()
-        .select(
-          "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
-        );
-      await redis.set("allCourses", JSON.stringify(allCourses));
-      res.status(200).json({ success: true, allCourses });
-    }
+    const allCourses = await courseModel
+      .find()
+      .select(
+        "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
+      );
+    res.status(200).json({ success: true, allCourses });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
   }
@@ -178,7 +178,7 @@ export const addQuestion = catchAsyncErrors(async function (
       message: `You have a new question in ${courseContent?.title}.`,
     });
     // save the updated course
-    await course?.save();
+    await course?.save({ validateBeforeSave: false });
     res.status(200).json({ success: true, course });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
@@ -220,10 +220,12 @@ export const addReply = catchAsyncErrors(async function (
     const newReply: any = {
       user: req.user,
       reply,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     question.questionReplies?.push(newReply);
-    await course?.save();
+    await course?.save({ validateBeforeSave: false });
 
     if (req.user?._id === question.user._id) {
       await notificationModel.create({
@@ -293,12 +295,14 @@ export const addReview = catchAsyncErrors(async function (
     course?.reviews.forEach((review: any) => (avg += review.rating));
 
     if (course) course.ratings = avg / course.reviews.length;
-    await course?.save();
+    await course?.save({ validateBeforeSave: false });
+    await redis.set(courseId, JSON.stringify(course), "EX", 604800);
 
-    const notification = {
+    await notificationModel.create({
+      user: req.user?._id,
       title: "New Review Recieved!",
       message: `${req.user?.name} has given a review in ${course?.name}!`,
-    };
+    });
     res.status(200).json({ success: true, course });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
@@ -306,7 +310,7 @@ export const addReview = catchAsyncErrors(async function (
 });
 
 interface IAddReplyToReview {
-  comment: string;
+  reply: string;
   courseId: string;
   reviewId: string;
 }
@@ -317,7 +321,7 @@ export const addReplyToReview = catchAsyncErrors(async function (
   next: NextFunction
 ) {
   try {
-    const { comment, courseId, reviewId } = req.body as IAddReplyToReview;
+    const { reply, courseId, reviewId } = req.body as IAddReplyToReview;
 
     const course = await courseModel.findById(courseId);
     if (!course) return next(new ErrorHandler("course not found!", 404));
@@ -329,13 +333,16 @@ export const addReplyToReview = catchAsyncErrors(async function (
 
     const replyData: any = {
       user: req.user,
-      comment,
+      reply,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     if (!review.commentReplies) {
       review.commentReplies = [];
     }
     review.commentReplies?.push(replyData);
-    await course.save();
+    await course.save({ validateBeforeSave: false });
+    await redis.set(courseId, JSON.stringify(course), "EX", 604800);
     res.status(200).json({ success: true, course });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));

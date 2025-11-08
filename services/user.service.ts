@@ -27,9 +27,19 @@ export const getAllUsersService = catchAsyncErrors(async function (
 
 export const updateUserRoleService = async function (
   res: Response,
-  id: string,
+  email: string,
   role: string
 ) {
-  const user = await userModel.findByIdAndUpdate(id, { role }, { new: true });
-  res.status(200).json({ success: true, user });
+  const user = await userModel.findOneAndUpdate(
+    { email },
+    { role },
+    { new: true }
+  );
+  if (!user)
+    return res.status(404).json({ success: false, message: "User not found!" });
+
+  res.status(200).json({
+    success: true,
+    user,
+  });
 };

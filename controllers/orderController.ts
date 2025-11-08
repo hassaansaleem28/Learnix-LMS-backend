@@ -9,6 +9,10 @@ import ejs from "ejs";
 import path from "path";
 import sendMail from "../utils/nodemailer";
 import notificationModel from "../models/notificationModel";
+import Stripe from "stripe";
+import { redis } from "../utils/redis";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
 export const createOrder = catchAsyncErrors(async function (
   req: Request,
@@ -17,6 +21,18 @@ export const createOrder = catchAsyncErrors(async function (
 ) {
   try {
     const { courseId, payment_info } = req.body as unknown as IOrder;
+
+    if (payment_info) {
+      if ("id" in payment_info) {
+        const paymentIntentId: any = payment_info.id as any;
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+          paymentIntentId
+        );
+        if (paymentIntent.status !== "succeeded") {
+          return next(new ErrorHandler("Payment not authorized!", 400));
+        }
+      }
+    }
     const user = await userModel.findById(req.user?._id);
 
     const courseExistsInUser = user?.courses.some(
@@ -63,6 +79,7 @@ export const createOrder = catchAsyncErrors(async function (
       return next(new ErrorHandler(error.message, 400));
     }
     user?.courses.push(course?.id);
+    await redis.set(req.user?._id as any, JSON.stringify(user));
     await user?.save();
 
     await notificationModel.create({
@@ -70,8 +87,9 @@ export const createOrder = catchAsyncErrors(async function (
       title: "New Order",
       message: `You have a new Order from ${course?.name}`,
     });
-    course.purchased = (course.purchased ?? 0) + 1;
-    await course.save();
+    await courseModel.findByIdAndUpdate(courseId, {
+      $inc: { purchased: 1 },
+    });
     newOrder(data, res, next);
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
@@ -85,6 +103,45 @@ export const getAllOrders = catchAsyncErrors(async function (
 ) {
   try {
     getAllOrdersService(req, res, next);
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});
+
+// send stripe publishable key
+export const getStripePublicKey = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    res.status(200).json({
+      success: true,
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+    });
+  } catch (error: any) {
+    return next(new ErrorHandler(error.message, 400));
+  }
+});
+
+export const newPayment = catchAsyncErrors(async function (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const myPayment = await stripe.paymentIntents.create({
+      amount: req.body.amount,
+      currency: "USD",
+      metadata: {
+        company: "Learnix Inc",
+      },
+      automatic_payment_methods: { enabled: true },
+    });
+    res.status(200).json({
+      success: true,
+      client_secret: myPayment.client_secret,
+    });
   } catch (error: any) {
     return next(new ErrorHandler(error.message, 400));
   }
