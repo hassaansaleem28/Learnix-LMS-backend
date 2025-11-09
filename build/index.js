@@ -19,7 +19,10 @@ const express_rate_limit_1 = require("express-rate-limit");
 const app = (0, express_1.default)();
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use((0, cookie_parser_1.default)());
-app.use((0, cors_1.default)({ origin: ["http://localhost:3000"], credentials: true }));
+app.use((0, cors_1.default)({
+    origin: ["https://lms-frontend-plum-three.vercel.app"],
+    credentials: true,
+}));
 (0, mongodb_1.connectDB)();
 const limiter = (0, express_rate_limit_1.rateLimit)({
     windowMs: 15 * 60 * 1000, // 15 minutes
