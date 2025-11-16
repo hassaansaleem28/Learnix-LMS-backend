@@ -18,7 +18,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: ["https://learnix-lms.vercel.app"],
+    origin: "https://learnix-lms.vercel.app",
     credentials: true,
   })
 );
