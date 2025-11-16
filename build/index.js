@@ -20,7 +20,7 @@ const app = (0, express_1.default)();
 app.use(express_1.default.json({ limit: "50mb" }));
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({
-    origin: ["https://lms-frontend-plum-three.vercel.app"],
+    origin: ["https://learnix-lms.vercel.app"],
     credentials: true,
 }));
 (0, mongodb_1.connectDB)();
